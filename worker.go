@@ -16,11 +16,13 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"sort"
 	"text/tabwriter"
 	"time"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/gcping/internal/config"
 )
@@ -41,6 +43,30 @@ func (i *input) HTTP() output {
 		if res.StatusCode != http.StatusOK {
 			return fmt.Errorf("status code: %v", res.StatusCode)
 		}
+		return nil
+	})
+}
+
+func (i *input) TCP() output {
+	return i.benchmark(func() error {
+		// TBD resolve address only once at start and store in input
+	        addr := strings.TrimLeft(i.endpoint, "https://") + ":443"  // TBD handle case where endpoint starts with http://
+		resolvedAddr, err := net.ResolveTCPAddr("tcp4", addr)
+		start := time.Now()
+		if err != nil {
+			fmt.Printf("Cannot resolve %s\n", addr)
+			return err
+		}
+		if verbose {
+			duration := time.Since(start)
+			fmt.Printf("checking TCP connectivity to %s (%s) resolution took %v\n", addr, resolvedAddr.String(), duration)
+		}
+	        conn, err := tcpClient.Dial("tcp", resolvedAddr.String())
+	        if err != nil {
+			fmt.Printf("TCP connect failed to %s\n", addr)
+		        return err
+	        }
+	        defer conn.Close()
 		return nil
 	})
 }
@@ -102,7 +128,12 @@ func (w *worker) start() {
 	for worker := 0; worker < concurrency; worker++ {
 		go func() {
 			for m := range w.inputs {
-				o := m.HTTP()
+				var o output
+                                if tcpMode {
+					o = m.TCP()
+				} else {
+					o = m.HTTP()
+				}
 				w.outputs <- o
 			}
 		}()

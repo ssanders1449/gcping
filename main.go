@@ -19,6 +19,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -35,10 +36,12 @@ var (
 	csvCum       bool
 	verbose      bool
 	region       string
+	tcpMode      bool
 	endpointsURL string
 	// TODO(jbd): Add payload options such as body size.
 
 	client *http.Client // TODO(jbd): One client per worker?
+	tcpClient *net.Dialer // for tcpMode
 )
 
 func main() {
@@ -48,6 +51,7 @@ func main() {
 	flag.DurationVar(&timeout, "t", time.Duration(0), "")
 	flag.BoolVar(&verbose, "v", false, "")
 	flag.BoolVar(&csv, "csv", false, "")
+	flag.BoolVar(&tcpMode, "tcp", false, "")
 	flag.BoolVar(&csvCum, "csv-cum", false, "")
 	flag.StringVar(&region, "r", "", "")
 	flag.StringVar(&endpointsURL, "url", "https://global.gcping.com/api/endpoints", "")
@@ -83,6 +87,7 @@ func main() {
 	client = &http.Client{
 		Timeout: timeout,
 	}
+	tcpClient = &net.Dialer{}
 
 	w := &worker{}
 	go w.start()
@@ -120,6 +125,7 @@ Options:
 
 -csv     CSV output; disables verbose output.
 -v       Verbose output.
+-tcp     Only test TCP connect time to endpoint (defaut is https request to endpoint+"/api/ping")
 
 Need a website version? See gcping.com
 `
